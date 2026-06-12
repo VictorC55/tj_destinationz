@@ -1,0 +1,44 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Sensitive data — student names + name<->ID map
+data/name_map.csv
+data/raw_destinations.csv
+
+# Raw HTML pages contain unredacted student names, GPAs, decisions, etc.
+# Keep them local only; the goose placeholder stays tracked.
+htmls/*.html
+
+# Generated data + indexes (regenerable from the pipeline)
+data/chroma/
+data/clean_destinations.csv
+eval/results.json
+
+# Fine-tuning artifacts
+models/
+checkpoints/
+*.safetensors
+*.bin
+*.gguf
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp

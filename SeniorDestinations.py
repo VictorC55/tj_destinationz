@@ -1,6 +1,7 @@
 import sys
 import os
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
 from openai import OpenAI
 
 # RUN IN CMD/POWERSHELL
@@ -8,13 +9,18 @@ from openai import OpenAI
 # Capture command line arguments
 args = sys.argv[1:]
 
-# Make sure to rotate this key if it gets public exposure!
-os.environ["OPENROUTER_API_KEY"] = "put key here"
+# Load OPENROUTER_API_KEY from a local .env file (see .env.example).
+# Never hardcode the key in source — committed keys get scraped from GitHub
+# within minutes and abused.
+load_dotenv()
 
 # 1. Configure the OpenRouter Client
 api_key = os.environ.get("OPENROUTER_API_KEY")
 if not api_key:
-    raise ValueError("API key not found. Please set OPENROUTER_API_KEY.")
+    raise ValueError(
+        "OPENROUTER_API_KEY not set. Copy .env.example to .env and add your key, "
+        "or export OPENROUTER_API_KEY in your shell."
+    )
 
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",

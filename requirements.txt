@@ -1,0 +1,36 @@
+# Scraping + parsing
+requests>=2.31
+beautifulsoup4>=4.12
+lxml>=5.0
+
+# Data handling
+pandas>=2.2
+python-dotenv>=1.0
+tqdm>=4.66
+
+# LLM clients
+openai>=1.40
+anthropic>=0.34
+
+# RAG: vector DB + local embeddings
+chromadb>=0.5
+sentence-transformers>=3.0
+tiktoken>=0.7
+
+# Fully-local LLM (rag_query_local.py) — uses Metal on Apple Silicon by default.
+# huggingface_hub is used by download_model.py to pull the GGUF file.
+llama-cpp-python>=0.3
+huggingface_hub>=0.24
+
+# Evaluation + plotting
+scikit-learn>=1.4
+matplotlib>=3.8
+rapidfuzz>=3.9
+
+# --- Optional: only needed for Section 6 (LoRA fine-tuning) ---
+# transformers>=4.44
+# datasets>=2.20
+# peft>=0.12
+# accelerate>=0.33
+# bitsandbytes>=0.43
+# torch>=2.3
