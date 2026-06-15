@@ -21,7 +21,7 @@ from tqdm import tqdm
 CLEAN = Path("data/clean_destinations.csv")
 CHROMA_DIR = Path("data/chroma")
 COLLECTION_NAME = "tj_destinations"
-EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"  # 768-dim, stronger semantic matching than MiniLM
 BATCH_SIZE = 32
 
 
@@ -68,17 +68,26 @@ def row_to_passage(row: pd.Series) -> str:
 
     score_str = ", ".join(f"{k} {v}" for k, v in scores.items()) or "none reported"
 
+    # Front-load a one-line summary — embeddings weight the beginning of a passage
+    # more heavily, so concentrating the most distinguishing facts up front improves
+    # semantic recall on queries like "students attending UF with high GPA".
+    summary = (
+        f"Profile: GPA {fmt_score(row.get('gpa'))}, "
+        f"SAT {fmt_score(row.get('sat_total'))}, "
+        f"ACT {fmt_score(row.get('act_composite'))}, "
+        f"attending {attending or 'undecided'}, "
+        f"{len(accepted)} acceptance(s), {len(denied)} denial(s)."
+    )
+
     lines = [
         f"Student {row['student_id']} (TJHSST class of 2026).",
-        f"GPA: {fmt_score(row.get('gpa'))}. "
-        f"SAT total: {fmt_score(row.get('sat_total'))}. "
-        f"ACT composite: {fmt_score(row.get('act_composite'))}.",
-        f"All test scores: {score_str}.",
+        summary,
         f"Accepted to: {', '.join(accepted) if accepted else 'none listed'}.",
         f"Attending: {attending or 'not specified'}.",
         f"Denied from: {', '.join(denied) if denied else 'none listed'}.",
         f"Waitlisted at: {', '.join(waitlisted) if waitlisted else 'none listed'}.",
         f"Deferred at: {', '.join(deferred) if deferred else 'none listed'}.",
+        f"All test scores: {score_str}.",
         f"Biography: {biography}",
     ]
     return "\n".join(lines)

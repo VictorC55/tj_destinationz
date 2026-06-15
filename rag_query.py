@@ -18,19 +18,22 @@ from chromadb.utils import embedding_functions
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from filters import extract_metadata_filter
+
 CHROMA_DIR = Path("data/chroma")
 COLLECTION_NAME = "tj_destinations"
-EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
 
 OPENAI_MODEL = "gpt-4o-mini"
-N_RETRIEVE = 8
+N_RETRIEVE = 4
 MAX_TOKENS = 600
 
 SYSTEM_PROMPT = (
     "You are an assistant that answers questions about TJHSST class of 2026 college "
     "destinations using ONLY the provided context passages. If the answer isn't in the "
     "context, say so. Do not invent students, schools, or statistics. Refer to students "
-    "by their pseudonymous ID (e.g. student_dc4cbc69)."
+    "by their pseudonymous ID (e.g. student_dc4cbc69). Attribute each fact to a specific "
+    "student ID — do not merge data across students."
 )
 
 
@@ -52,8 +55,16 @@ def load_openai() -> OpenAI:
 
 
 def retrieve(collection, question: str, k: int = N_RETRIEVE) -> str:
-    hits = collection.query(query_texts=[question], n_results=k)
-    return "\n\n---\n\n".join(hits["documents"][0])
+    where = extract_metadata_filter(question)
+    kwargs = {"query_texts": [question], "n_results": k}
+    if where is not None:
+        kwargs["where"] = where
+    hits = collection.query(**kwargs)
+    docs = hits["documents"][0]
+    if not docs and where is not None:
+        hits = collection.query(query_texts=[question], n_results=k)
+        docs = hits["documents"][0]
+    return "\n\n---\n\n".join(docs)
 
 
 def answer(client: OpenAI, collection, question: str) -> str:

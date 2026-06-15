@@ -14,12 +14,14 @@ import chromadb
 from chromadb.utils import embedding_functions
 from llama_cpp import Llama
 
+from filters import extract_metadata_filter
+
 MODEL_PATH = Path("models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf")
 CHROMA_DIR = Path("data/chroma")
 COLLECTION_NAME = "tj_destinations"
-EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
 
-N_RETRIEVE = 8
+N_RETRIEVE = 4
 N_CTX = 8192        # context window the model sees (prompt + completion)
 N_GPU_LAYERS = -1   # -1 = offload everything to Metal on Apple Silicon
 MAX_TOKENS = 600
@@ -28,7 +30,8 @@ SYSTEM_PROMPT = (
     "You are an assistant that answers questions about TJHSST class of 2026 college "
     "destinations using ONLY the provided context passages. If the answer isn't in the "
     "context, say so. Do not invent students, schools, or statistics. Refer to students "
-    "by their pseudonymous ID (e.g. student_dc4cbc69)."
+    "by their pseudonymous ID (e.g. student_dc4cbc69). Attribute each fact to a specific "
+    "student ID — do not merge data across students."
 )
 
 
@@ -55,8 +58,17 @@ def load_llm() -> Llama:
 
 
 def retrieve(collection, question: str, k: int = N_RETRIEVE) -> str:
-    hits = collection.query(query_texts=[question], n_results=k)
-    return "\n\n---\n\n".join(hits["documents"][0])
+    where = extract_metadata_filter(question)
+    kwargs = {"query_texts": [question], "n_results": k}
+    if where is not None:
+        kwargs["where"] = where
+    hits = collection.query(**kwargs)
+    docs = hits["documents"][0]
+    if not docs and where is not None:
+        # Filter excluded everyone — fall back to unfiltered search rather than empty context.
+        hits = collection.query(query_texts=[question], n_results=k)
+        docs = hits["documents"][0]
+    return "\n\n---\n\n".join(docs)
 
 
 def answer(llm: Llama, collection, question: str) -> str:
