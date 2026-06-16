@@ -10,6 +10,7 @@ once. Launch with:
 and open the URL it prints (default http://127.0.0.1:7860).
 """
 
+import time
 from pathlib import Path
 
 import chromadb
@@ -76,36 +77,71 @@ def retrieve(question: str) -> list[str]:
     return docs
 
 
-def generate(system: str, user: str) -> str:
-    out = llm.create_chat_completion(
+def stream_generate(system: str, user: str):
+    """Yield text deltas as the model produces them."""
+    stream = llm.create_chat_completion(
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
         max_tokens=MAX_TOKENS,
         temperature=0.2,
+        stream=True,
     )
-    return out["choices"][0]["message"]["content"].strip()
+    for chunk in stream:
+        delta = chunk["choices"][0]["delta"].get("content", "")
+        if delta:
+            yield delta
 
 
-def answer_both(question: str) -> tuple[str, str, str]:
+def answer_both(question: str):
+    """Generator: yields (rag_text, baseline_text, retrieved_view, status) on every new token."""
     question = (question or "").strip()
     if not question:
-        return "", "", ""
+        yield "", "", "", ""
+        return
+
+    t0 = time.time()
+    rag_done_at: float | None = None
+
+    def status(phase: str) -> str:
+        elapsed = time.time() - t0
+        if phase == "rag":
+            return f"⏱ {elapsed:.1f}s — generating RAG response…"
+        if phase == "baseline":
+            rag_t = rag_done_at - t0 if rag_done_at else 0
+            base_t = elapsed - (rag_done_at - t0 if rag_done_at else 0)
+            return f"⏱ {elapsed:.1f}s — RAG done in {rag_t:.1f}s, baseline {base_t:.1f}s and counting…"
+        if phase == "done":
+            rag_t = rag_done_at - t0 if rag_done_at else 0
+            base_t = elapsed - (rag_done_at - t0 if rag_done_at else 0)
+            return f"✅ Done in {elapsed:.1f}s — RAG: {rag_t:.1f}s, baseline: {base_t:.1f}s"
+        return f"⏱ {elapsed:.1f}s"
 
     passages = retrieve(question)
+    retrieved_view = "\n\n────────\n\n".join(
+        f"[{i + 1}] {p}" for i, p in enumerate(passages)
+    )
     rag_user = (
         f"Context passages:\n" + "\n\n---\n\n".join(passages)
         + f"\n\nQuestion: {question}\n\n"
         "Answer using only the context above. Cite specific student IDs."
     )
-    rag_answer = generate(RAG_SYSTEM, rag_user)
-    baseline_answer = generate(BASELINE_SYSTEM, question)
 
-    retrieved_view = "\n\n────────\n\n".join(
-        f"[{i + 1}] {p}" for i, p in enumerate(passages)
-    )
-    return rag_answer, baseline_answer, retrieved_view
+    rag_text = ""
+    base_text = ""
+    yield "⏳ Generating…", "⏳ Waiting for RAG to finish…", retrieved_view, status("rag")
+
+    for token in stream_generate(RAG_SYSTEM, rag_user):
+        rag_text += token
+        yield rag_text, "⏳ Waiting for RAG to finish…", retrieved_view, status("rag")
+
+    rag_done_at = time.time()
+    for token in stream_generate(BASELINE_SYSTEM, question):
+        base_text += token
+        yield rag_text, base_text, retrieved_view, status("baseline")
+
+    yield rag_text, base_text, retrieved_view, status("done")
 
 
 with gr.Blocks(title="TJ Destinations: RAG vs Baseline") as demo:
@@ -120,6 +156,7 @@ with gr.Blocks(title="TJ Destinations: RAG vs Baseline") as demo:
         lines=2,
     )
     submit = gr.Button("Ask both", variant="primary")
+    status_out = gr.Markdown("")
     with gr.Row():
         with gr.Column():
             gr.Markdown("### Custom RAG (Llama 8B + retrieved TJ passages)")
@@ -133,12 +170,12 @@ with gr.Blocks(title="TJ Destinations: RAG vs Baseline") as demo:
     submit.click(
         fn=answer_both,
         inputs=question,
-        outputs=[rag_out, base_out, retrieved_out],
+        outputs=[rag_out, base_out, retrieved_out, status_out],
     )
     question.submit(
         fn=answer_both,
         inputs=question,
-        outputs=[rag_out, base_out, retrieved_out],
+        outputs=[rag_out, base_out, retrieved_out, status_out],
     )
 
 if __name__ == "__main__":

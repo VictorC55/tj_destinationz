@@ -16,7 +16,6 @@ REPO_ID = "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF"
 FILENAME = "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
 LOCAL_DIR = Path("models")
 
-
 def main() -> None:
     LOCAL_DIR.mkdir(exist_ok=True)
     target = LOCAL_DIR / FILENAME
