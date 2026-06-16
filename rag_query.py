@@ -25,7 +25,7 @@ COLLECTION_NAME = "tj_destinations"
 EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
 
 OPENAI_MODEL = "gpt-4o-mini"
-N_RETRIEVE = 4
+N_RETRIEVE = 6
 MAX_TOKENS = 600
 
 SYSTEM_PROMPT = (
@@ -33,7 +33,16 @@ SYSTEM_PROMPT = (
     "destinations using ONLY the provided context passages. If the answer isn't in the "
     "context, say so. Do not invent students, schools, or statistics. Refer to students "
     "by their pseudonymous ID (e.g. student_dc4cbc69). Attribute each fact to a specific "
-    "student ID — do not merge data across students."
+    "student ID — do not merge data across students.\n\n"
+    "When giving advice or recommendations, you MUST cite specific named activities "
+    "from the context — actual clubs, internships, research programs, summer programs, "
+    "sports, jobs, or competitions that students in the context did. Concrete examples "
+    "from the data are far more valuable than abstract advice. Do NOT give generic "
+    "recommendations like 'join clubs that align with your interests' or 'pursue what "
+    "you're passionate about' — instead name specific things, e.g. 'student_dc4cbc69 "
+    "did ASSIP bio research at GMU and a Georgetown MedStar Hospital internship'. "
+    "If the retrieved students don't have activities relevant to the question, say so "
+    "plainly rather than substituting generic guidance."
 )
 
 
@@ -72,7 +81,10 @@ def answer(client: OpenAI, collection, question: str) -> str:
     user_prompt = (
         f"Context passages:\n{context}\n\n"
         f"Question: {question}\n\n"
-        "Answer using only the context above. Cite specific student IDs."
+        "Answer using only the context above. When recommending activities, programs, "
+        "internships, or clubs, name specific ones that students in the context actually "
+        "did and cite which student (by ID) did each one. If the context lacks specifics "
+        "relevant to this question, say so rather than offering generic advice."
     )
     resp = client.chat.completions.create(
         model=OPENAI_MODEL,
